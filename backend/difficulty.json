@@ -1,0 +1,9 @@
+{
+  "rubric_version": "english-v1",
+  "frequency_thresholds": [
+    {"min_zipf": 5, "score": 0},
+    {"min_zipf": 4, "score": 1},
+    {"min_zipf": 3, "score": 2},
+    {"min_zipf": 0, "score": 3}
+  ]
+}
