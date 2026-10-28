@@ -4,13 +4,14 @@ import re
 import uuid
 from contextlib import asynccontextmanager
 from typing import Literal
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from . import config
 from .db import connect, init_db, seed_demo, now
 from .dictionary import lookup, wordnet_available
+from .collection import collection_status, create_job, recover_jobs, run_job
 
 
 def normalize(value):
@@ -21,6 +22,7 @@ def normalize(value):
 async def lifespan(app):
     init_db()
     seed_demo()
+    recover_jobs()
     wordnet_available()
     yield
 
@@ -145,6 +147,25 @@ def dashboard():
                 'completed_exams':db.execute('SELECT COUNT(*) FROM exams WHERE result_json IS NOT NULL').fetchone()[0]}
 
 
+@app.get('/api/dictionary/collection')
+def get_collection():
+    return collection_status()
+
+
+class CollectionInput(BaseModel):
+    limit: int = Field(default=10, ge=1, le=500, strict=True)
+
+
+@app.post('/api/dictionary/collection', status_code=202)
+def start_collection(body: CollectionInput, background_tasks: BackgroundTasks):
+    try:
+        job_id = create_job(body.limit)
+    except ValueError as exc:
+        raise HTTPException(409 if '이미' in str(exc) else 400, str(exc)) from exc
+    background_tasks.add_task(run_job, job_id)
+    return {'id': job_id, 'status': 'queued'}
+
+
 @app.get('/api/notebooks')
 def notebooks():
     with connect() as db:
@@ -254,7 +275,7 @@ def levels():
         for level in [1,2,3]:
             all_cards = source_cards(db, Source(kind='level',level=level))
             result.append({'level':level,'demo':sum(c['classification_kind']=='manual_demo' for c in all_cards),
-                           'ai':sum(c['classification_kind']=='ai' for c in all_cards),'total':len(all_cards)})
+                           'ai':sum(c['classification_kind'] in ('ai','ai_auto') for c in all_cards),'total':len(all_cards)})
         return result
 
 
@@ -301,11 +322,11 @@ def source_cards(db, source):
     if source.kind == 'level':
         if source.level is None:
             raise HTTPException(422,'레벨을 선택해 주세요.')
-        clause = "WHERE c.kind='public' AND d.level=? AND (d.review_status='demo' OR (d.classification_kind='ai' AND d.review_status='approved'))"
+        clause = "WHERE c.kind='public' AND d.level=? AND (d.review_status='demo' OR (d.classification_kind='ai' AND d.review_status='approved') OR (d.classification_kind='ai_auto' AND d.review_status='automatic'))"
         if source.category == 'demo':
             clause += " AND d.classification_kind='manual_demo'"
         if source.category == 'ai':
-            clause += " AND d.classification_kind='ai' AND d.review_status='approved'"
+            clause += " AND d.classification_kind IN ('ai','ai_auto') AND d.review_status IN ('approved','automatic')"
         return cards_query(db,clause,(source.level,))
     if not source.exam_id:
         raise HTTPException(422,'완료된 시험을 선택해 주세요.')

@@ -343,8 +343,8 @@ function HomePage() {
       <div className="info-strip">
         <Leaf size={19} />
         <p>
-          공용 단어는 <strong>시연용 수동 분류</strong> 30개로 시작합니다. AI
-          평가와 검수 완료 데이터는 별도로 구분합니다.
+          공용 단어는 <strong>시연용 수동 분류</strong> 30개로 시작합니다.
+          레벨별 학습에서 WordNet 단어를 자동 수집하고 난이도를 분류할 수 있습니다.
         </p>
       </div>
       {health.data && (

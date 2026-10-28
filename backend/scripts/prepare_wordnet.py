@@ -7,7 +7,7 @@ from app.config import ROOT
 import os
 
 
-def main():
+def prepare_wordnet():
     destination=Path(os.getenv('NLTK_DATA', str(ROOT/'data/nltk')))
     downloader=Downloader(download_dir=str(destination))
     package=downloader.info('wordnet')
@@ -23,6 +23,10 @@ def main():
     if not wordnet_available():
         raise RuntimeError('설치한 WordNet을 읽을 수 없습니다.')
     print('WordNet 설치 및 공식 SHA-256 검증 완료. 영어 정의를 사용할 수 있습니다.')
+
+
+def main():
+    prepare_wordnet()
 
 
 if __name__=='__main__':

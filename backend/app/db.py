@@ -52,6 +52,18 @@ def init_db():
           accepted_answers TEXT NOT NULL DEFAULT '[]', kind TEXT NOT NULL DEFAULT 'personal',
           dictionary_id INTEGER REFERENCES dictionary_senses(id), created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS collection_jobs (
+          id TEXT PRIMARY KEY, status TEXT NOT NULL, phase TEXT NOT NULL,
+          requested INTEGER NOT NULL, collected INTEGER NOT NULL DEFAULT 0,
+          senses INTEGER NOT NULL DEFAULT 0, total_groups INTEGER NOT NULL DEFAULT 0,
+          evaluated INTEGER NOT NULL DEFAULT 0, reused INTEGER NOT NULL DEFAULT 0,
+          failed INTEGER NOT NULL DEFAULT 0, frequency_review INTEGER NOT NULL DEFAULT 0,
+          published INTEGER NOT NULL DEFAULT 0, current_word TEXT,
+          model TEXT NOT NULL, rubric_version TEXT NOT NULL,
+          error TEXT, created_at TEXT NOT NULL, finished_at TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS one_active_collection
+          ON collection_jobs((1)) WHERE status IN ('queued','running');
         CREATE UNIQUE INDEX IF NOT EXISTS public_card_sense ON cards(dictionary_id) WHERE kind='public';
         CREATE TABLE IF NOT EXISTS notebooks (
           id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL

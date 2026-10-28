@@ -429,9 +429,9 @@ export function ExamSetup() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                 >
-                  <option value="all">전체 (시연 + 검수 완료 AI)</option>
+                  <option value="all">전체 (시연 + AI 분류)</option>
                   <option value="demo">시연용 수동 분류</option>
-                  <option value="ai">AI 평가 · 검수 완료</option>
+                  <option value="ai">AI 분류 (자동·검수 완료)</option>
                 </select>
               </label>
               {levels.error && (

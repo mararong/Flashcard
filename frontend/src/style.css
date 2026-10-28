@@ -1872,3 +1872,15 @@ select {
     animation: none !important;
   }
 }
+.collection-panel {
+  padding: 24px;
+  margin: 20px 0;
+  border: 1px solid var(--border, #dce5de);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+}
+.collection-panel h3 { margin: 0 0 10px; }
+.collection-actions { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+.collection-actions label { margin: 0; min-width: 120px; }
+.collection-progress { margin-top: 18px; padding-top: 16px; border-top: 1px solid #dce5de; overflow-wrap: anywhere; }
+.collection-progress p { margin: 8px 0 0; }

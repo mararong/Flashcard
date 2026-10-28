@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, go, posName, type Card, type Notebook, type Source } from "./api";
+import { WordnetCollection } from "./WordnetCollection";
 import {
   Empty,
   Failure,
@@ -869,16 +870,17 @@ export function LevelsPage() {
       <div className="info-strip">
         <LeafIcon />
         <p>
-          첫 실행 데이터는 <strong>시연용 수동 분류</strong>입니다. 실제 AI
-          결과는 배치 평가 후 검수된 단어만 공개됩니다.
+          WordNet에서 수집한 단어는 <strong>AI 자동 분류</strong>로 표시됩니다.
+          자동 분류는 추정 난이도이며, 사람이 확인한 결과는 검수 완료로 구분합니다.
         </p>
       </div>
+      <WordnetCollection onComplete={cards.refresh} />
       <div className="toolbar">
         <div className="tabs">
           {[
             ["all", "전체"],
             ["demo", "시연용 수동 분류"],
-            ["ai", "AI 평가 · 검수 완료"],
+            ["ai", "AI 분류"],
           ].map(([v, l]) => (
             <button
               key={v}
@@ -908,7 +910,7 @@ export function LevelsPage() {
               <span className="tag">
                 {c.classification_kind === "manual_demo"
                   ? "시연용 수동 분류"
-                  : "AI · 검수 완료"}
+                  : c.classification_kind === "ai_auto" ? "AI 자동 분류" : "AI · 검수 완료"}
               </span>
             </WordRow>
           ))}
@@ -916,7 +918,7 @@ export function LevelsPage() {
       ) : (
         <Empty
           title="이 조건의 단어가 아직 없어요"
-          description="AI 데이터는 모델 연결, 배치 평가, 검수를 마친 뒤 나타납니다. 시연용 수동 분류로 먼저 학습해 보세요."
+          description="자동 수집·난이도 분류를 실행하면 WordNet 단어로 학습할 수 있습니다."
         />
       )}
       {study && (

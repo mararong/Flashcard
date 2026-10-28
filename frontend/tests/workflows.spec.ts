@@ -1,5 +1,35 @@
 import { test, expect, type Page } from "@playwright/test";
 
+test("WordNet 자동 수집 진행과 완료 후 레벨 갱신", async ({ page }) => {
+  let started = false;
+  let polls = 0;
+  const card = { id: 999999, word: "apple", definition: "a fruit", pos: "n", notes: "",
+    accepted_answers: [], important: false, forgotten: false, kind: "public", classification_kind: "ai_auto" };
+  await page.route("**/api/dictionary/collection", async route => {
+    if (route.request().method() === "POST") {
+      expect(route.request().postDataJSON()).toEqual({ limit: 10 });
+      started = true;
+      await route.fulfill({ json: { id: "browser-test", status: "queued" } });
+      return;
+    }
+    if (started) polls++;
+    const done = polls > 1;
+    await route.fulfill({ json: { model: "test", counts: { words: done ? 10 : 0, senses: done ? 12 : 0, classified: done ? 12 : 0 },
+      job: started ? { id: "browser-test", status: done ? "complete" : "running", phase: "난이도 평가",
+        requested: 10, collected: 10, evaluated: done ? 12 : 1, total_groups: 12,
+        published: done ? 12 : 0, failed: 0, frequency_review: 0, error: null, current_word: "apple/n" } : null } });
+  });
+  await page.route("**/api/levels/1/cards?category=ai", route => route.fulfill({ json: polls > 1 ? [card] : [] }));
+  await page.goto("/#/levels");
+  await page.getByRole("button", { name: "AI 분류", exact: true }).click();
+  await page.getByRole("button", { name: "자동 수집·난이도 분류", exact: true }).click();
+  await expect(page.getByRole("button", { name: "수집·분류 중…", exact: true })).toBeDisabled();
+  await expect(page.getByText("수집 완료", { exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(".word-row")).toHaveCount(1);
+  await expect(page.locator(".word-row")).toContainText("AI 자동 분류");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 async function book(
   page: Page,
   words: { word: string; definition: string; accepted_answers?: string[] }[],
@@ -188,7 +218,7 @@ test("레벨 출처·AI 없는 학습·발음 미지원", async ({ page }) => {
   );
   await page.goto("/#/levels");
   await page
-    .getByRole("button", { name: "AI 평가 · 검수 완료", exact: true })
+    .getByRole("button", { name: "AI 분류", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "이 조건의 단어가 아직 없어요" }),
