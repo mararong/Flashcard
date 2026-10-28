@@ -13,8 +13,7 @@ python -m venv .venv
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 npm --prefix frontend ci
 npm --prefix frontend run build
-$env:PYTHONPATH = "$PWD\backend"
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+node server.mjs
 ```
 
 브라우저 주소: `http://127.0.0.1:8000`. FastAPI가 빌드한 화면과 API를 함께 제공합니다. 최초 시작 시 레벨별 10개씩, 총 30개의 **시연용 수동 분류** 단어를 준비합니다. 종료는 터미널에서 `Ctrl+C`입니다.
@@ -26,7 +25,7 @@ cd C:\path\to\Flashcard
 npm --prefix frontend run dev
 ```
 
-개발 화면 주소: `http://127.0.0.1:5173`. Vite가 `/api`를 로컬 백엔드 8000으로 전달합니다. 프런트엔드 변경은 자동 반영됩니다. 백엔드 자동 반영을 원하면 위 uvicorn 명령에 `--reload`를 붙이세요.
+개발 화면 주소: `http://127.0.0.1:5173`. Vite가 `/api`를 로컬 백엔드 8000으로 전달합니다. 프런트엔드 변경은 자동 반영됩니다. 백엔드 자동 반영을 원하면 `node server.mjs --reload`로 실행하세요.
 
 ## Linux / macOS
 
@@ -36,10 +35,12 @@ python3 -m venv .venv
 test -f .env || cp .env.example .env
 npm --prefix frontend ci
 npm --prefix frontend run build
-PYTHONPATH=backend .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+node server.mjs
 ```
 
 별도 터미널에서 `npm --prefix frontend run dev`로 개발 화면을 실행할 수 있습니다. 모든 서버 명령과 기본 설정은 `127.0.0.1`에만 바인딩합니다. 공개 배포를 위한 설정은 포함하지 않습니다.
+
+설치 후에는 저장소 루트에서 `node server.mjs`만 실행하면 됩니다. 이 진입점은 Python 백엔드를 시작해 빌드된 화면과 API를 함께 제공합니다. 포트는 기본 8000이며 `PORT` 환경 변수로 변경할 수 있습니다. 개발 화면의 Vite 프록시는 기본 백엔드 포트 8000을 사용합니다.
 
 ## 사용 흐름
 
