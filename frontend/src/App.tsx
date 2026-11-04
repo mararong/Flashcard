@@ -357,7 +357,7 @@ function HomePage() {
       <div className="info-strip">
         <Leaf size={19} />
         <p>
-          공용 단어는 <strong>{IS_BROWSER_MODE ? "WordNet 10,000단어" : "시연용 수동 분류 30개"}</strong>로 시작합니다.
+          공용 단어는 <strong>{IS_BROWSER_MODE ? "WordNet 사전 · AI 평가 완료 단어만 레벨 학습에 포함" : "시연용 수동 분류 30개"}</strong>로 시작합니다.
           {IS_BROWSER_MODE
             ? "개인 단어장에 새 단어와 뜻을 직접 추가할 수 있습니다."
             : "레벨별 학습에서 WordNet 단어를 자동 수집하고 난이도를 분류할 수 있습니다."}

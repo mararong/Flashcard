@@ -174,13 +174,9 @@ test("여러 탭의 저장 충돌 방지, 삭제 규칙과 빈 출처", async ({
   await api(second, `/cards/${c.id}`, "DELETE");
   expect((await api(page, "/saved")).length).toBe(0);
   await page.goto("#/levels");
-  await expect(page.locator(".word-row")).toHaveCount(200);
-  const levels=await api(page,"/levels");
-  expect(levels.reduce((n:number,l:any)=>n+l.total,0)).toBe(10000);
-  const full=await api(page,"/study","POST",{source:{kind:"level",level:1},count:"all"});
-  expect(full.cards.length).toBe(878);
-  expect(new Set(full.cards.map((c:any)=>c.word)).size).toBe(878);
-  expect(full.cards.every((c:any)=>c.classification_kind==="frequency")).toBe(true);
+  await expect(page.getByRole('heading',{name:'이 조건의 단어가 아직 없어요'})).toBeVisible();
+  const levels=await api(page,'/levels');
+  expect(levels.reduce((n:number,l:any)=>n+l.total,0)).toBe(0);
   const lookup=await api(page,"/dictionary/lookup","POST",{words:["apple"]});
   expect(lookup.results[0].candidates[0].source).toBe("wordnet");
   await expect(
@@ -197,7 +193,7 @@ test('기존 개인 자료를 유지하며 사전을 한 번만 추가',async({p
   await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
   expect((await api(page,'/notebooks/8')).cards[0].word).toBe('myword');
   expect((await api(page,'/saved'))[0].id).toBe(7);
-  const levels=await api(page,'/levels');expect(levels.reduce((sum:number,l:any)=>sum+l.total,0)).toBe(10000);
+  const levels=await api(page,'/levels');expect(levels.reduce((sum:number,l:any)=>sum+l.total,0)).toBe(0);
   await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
   expect(await api(page,'/levels')).toEqual(levels);
 });

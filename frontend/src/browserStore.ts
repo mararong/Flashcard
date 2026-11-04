@@ -1,4 +1,5 @@
 import catalog from "./wordnet.json";
+import report from "../public/dictionary/report.json";
 import type { Card, Exam, Source, Study } from "./api";
 
 type StoredCard = Card & { level?: number };
@@ -30,14 +31,14 @@ function initial(): State {
   return state;
 }
 function installCatalog(state:State){
-  if(state.catalogVersion==='wordnet-3.0-10000-v1')return false;
-  const existing=new Set(Object.values(state.cards).filter(c=>c.classification_kind==='frequency').map(c=>c.word));
+  const version=report.catalog_version;
+  if(state.catalogVersion===version)return false;
+  for(const c of Object.values(state.cards))if(c.kind==='public'||c.kind==='dictionary')c.kind='archived';
   for(const entry of catalog){
-    if(existing.has(entry.word))continue;
     const id=++state.seq;
-    state.cards[id]={...entry,id,notes:'WordNet '+entry.source_version+' · '+entry.sense_key+' · Zipf '+entry.zipf+' · 사용 빈도 기준 임시 단계 (AI 평가 아님)',accepted_answers:[],important:false,forgotten:false,kind:'public',classification_kind:'frequency',dictionary_id:id};
+    state.cards[id]={...entry,level:entry.level ?? undefined,id,notes:'WordNet · '+entry.sense_key+' · '+(entry.level?'5개 항목 평가·검수 완료':'AI 평가·검수 대기'),accepted_answers:[],important:false,forgotten:false,kind:entry.level?'public':'dictionary',classification_kind:entry.level?'ai':'pending',dictionary_id:id};
   }
-  state.catalogVersion='wordnet-3.0-10000-v1';return true;
+  state.catalogVersion=version;return true;
 }
 let connection: Promise<IDBDatabase> | undefined;
 function database() {
@@ -122,7 +123,7 @@ function study(s: State, id: string) {
   return s.studies[id] || fail("학습 기록을 찾을 수 없습니다.");
 }
 function cards(s: State, source: Source): StoredCard[] {
-  let values = Object.values(s.cards);
+  let values = Object.values(s.cards).filter(c=>c.kind!=="archived");
   if (source.kind === "notebook")
     values = book(s, source.notebook_id!).ids.map((id) => card(s, id));
   else if (source.kind === "level")
@@ -211,7 +212,7 @@ function route(s: State, path: string, method: string, body: unknown): unknown {
   if (p[0] === "health")
     return {
       status: "ok",
-      wordnet_available: false,
+      wordnet_available: true,
       ai_configured: false,
       ai_model: null,
     };
@@ -321,13 +322,13 @@ function route(s: State, path: string, method: string, body: unknown): unknown {
   }
   if (p[0] === "dictionary")
     return {
-      wordnet_available: false,
+      wordnet_available: true,
       results: [...new Set<string>(b.words.map(norm).filter(Boolean))].map(
         (word) => ({
           word,
           candidates: all
-            .filter((c) => c.kind === "public" && norm(c.word) === word)
-            .map((c) => ({ ...c, source: c.classification_kind==="frequency"?"wordnet":"demo" })),
+            .filter((c) => (c.kind === "public" || c.kind === "dictionary") && norm(c.word) === word)
+            .map((c) => ({ ...c, source: c.classification_kind!=="manual_demo"?"wordnet":"demo" })),
         }),
       ),
     };

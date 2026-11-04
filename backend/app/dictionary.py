@@ -18,9 +18,11 @@ def wordnet_available():
 def wordnet_entries(word):
     from nltk.corpus import wordnet as wn
     token=word.lower().replace(' ', '_')
+    from .catalog_filter import word_reason,sense_reason
     entries=[]
     for syn in wn.synsets(token,lang='eng'):
         lemma=(wn.morphy(token,syn.pos()) or token).replace('_',' ')
+        if word_reason(lemma) or sense_reason(lemma,syn):continue
         entries.append((lemma,syn.pos(),syn.definition(),f'{lemma}:{syn.name()}',wn.get_version()))
     return entries
 

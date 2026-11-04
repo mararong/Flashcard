@@ -1,0 +1,16 @@
+{
+  "policy": "learner-content-v1",
+  "words": 10000,
+  "senses": 22238,
+  "approved": 0,
+  "excluded": {
+    "unattested_sense_needs_review": 67730,
+    "symbol_abbreviation_or_proper_spelling": 70095,
+    "unknown_frequency": 20939,
+    "proper_name_or_acronym": 25065,
+    "proper_name_instance": 6691,
+    "archaic_rare_or_abbreviation_sense": 262,
+    "function_word": 101
+  },
+  "catalog_version": "a0748ffec4a12c20ff695801055eefccbc1291f439451dfbda0cee6879ddaacd"
+}

@@ -849,11 +849,11 @@ export function LevelsPage() {
         title="레벨별 학습"
         description="세 가지 단계로, 내게 맞는 단어를 만나 보세요."
       />
-      {IS_BROWSER_MODE && <p className="notice">WordNet 10,000단어가 미리 준비되어 있습니다. 단계는 사용 빈도 기준이며 AI 난이도 평가가 아닙니다. 목록은 최대 200개를 표시하고 학습·시험은 해당 단계 전체에서 출제합니다.</p>}<div className="level-grid">
+      {IS_BROWSER_MODE && <p className="notice">부적절한 단어·의미를 제외한 WordNet 사전을 준비했습니다. 사용 빈도·추상성·복잡도·형태·맥락의 10점 평가와 검수가 완료된 단어만 레벨별 학습에 표시합니다. 평가 대기 단어는 개인 단어장에 직접 등록할 수 있습니다.</p>}<div className="level-grid">
         {[
-          { n: 1, title: "가볍게 시작하기", detail: IS_BROWSER_MODE ? "Zipf 5 이상 · 고빈도" : "0–3점 · 기초 단어" },
-          { n: 2, title: "한 걸음 더 넓게", detail: IS_BROWSER_MODE ? "Zipf 4 이상 · 중빈도" : "4–6점 · 중급 단어" },
-          { n: 3, title: "더 깊이 알아가기", detail: IS_BROWSER_MODE ? "Zipf 4 미만 · 저빈도" : "7–10점 · 고급 단어" },
+          { n: 1, title: "가볍게 시작하기", detail: "0–3점 · 기초 단어" },
+          { n: 2, title: "한 걸음 더 넓게", detail: "4–6점 · 중급 단어" },
+          { n: 3, title: "더 깊이 알아가기", detail: "7–10점 · 고급 단어" },
         ].map((l) => (
           <button
             className={`level-tile ${level === l.n ? "selected" : ""}`}

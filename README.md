@@ -10,7 +10,7 @@
 
 Pages에서는 Python 서버 없이 **IndexedDB**에 단어장, 카드, 중요·잊음 표시, 학습 세션, 시험 답안·결과를 저장합니다. 서버 모드의 SQLite와는 별도의 자료이며 자동으로 옮겨지거나 동기화되지 않습니다. 기기·브라우저가 바뀌면 별도 자료를 사용하고, 브라우저 데이터를 삭제하거나 시크릿 모드를 종료하면 자료를 잃을 수 있습니다.
 
-시험도 브라우저에서 채점합니다. 제출 전 화면과 시험 데이터 응답에는 정답을 넣지 않지만, 브라우저 저장소와 소스에는 정답 자료가 있으므로 서버 채점과 같은 보안 경계는 없습니다. 개인 연습용입니다. WordNet 자동 수집, Zipf 계산, Ollama 평가는 아래의 Python 서버 실행 모드에서 지원합니다. Pages는 미리 수집한 WordNet 영어 단어 10,000개와 개인 입력 단어로 학습·시험을 제공합니다.
+시험도 브라우저에서 채점합니다. 제출 전 화면과 시험 데이터 응답에는 정답을 넣지 않지만, 브라우저 저장소와 소스에는 정답 자료가 있으므로 서버 채점과 같은 보안 경계는 없습니다. 개인 연습용입니다. WordNet 자동 수집, Zipf 계산, Ollama 평가는 아래의 Python 서버 실행 모드에서 지원합니다. Pages는 필터링한 WordNet 사전을 포함합니다. 공용 레벨 학습·시험에는 5개 항목 평가와 검수를 완료한 의미만 사용합니다. 현재 사전은 AI 평가 대기 상태이며 개인 입력 단어의 학습·시험은 가능합니다.
 
 브라우저 모드를 로컬에서 확인하려면 PowerShell에서:
 
@@ -197,21 +197,28 @@ data/               로컬 SQLite·사전 데이터 (Git 제외)
 현재 제한: 브라우저의 실제 음성은 OS·브라우저 음성 목록에 따라 달라집니다. AI 모델의 의미 판단 품질은 별도 검수가 필요합니다. 대규모 사전 전수 수집·관리 웹사이트·다중 사용자 운영은 목표가 아닙니다. 기본 시연 단어의 점수는 실제 AI 평가가 아닌 수동 레벨 지정입니다. 서버는 단일 프로세스로 운영하며 동시에 여러 서버를 같은 DB에 연결하지 마세요.
 
 
-## 미리 준비한 WordNet 사전
+## WordNet 수집 필터와 정확한 레벨 분류
 
-GitHub Pages 첫 실행 시 **10,000개의 서로 다른 영어 표제어**가 브라우저 DB에 자동으로 들어갑니다. 직접 수집하거나 AI 모델을 설치할 필요 없이 레벨별 학습과 시험을 시작할 수 있습니다. 기존 개인 카드와 기록은 유지하면서 사전만 추가합니다.
+기능어 목록, 표기 검사, WordNet 의미의 고어·희귀 용법·약어 표시, 고유명사 instance 관계와 대문자 원형, 의미별 tagged usage count를 검사합니다. 기본 기능어·약어·기호·고유명사와 용례가 확인되지 않는 의미는 제외하거나 보류합니다. 단어 전체의 빈도가 높아도 그 단어의 드문 의미가 자동 포함되지 않도록 의미별로 검사합니다. 자동 필터의 의미 판단은 완벽하지 않으므로 최종 공개에는 검수가 필요합니다. 필터 버전과 제외 사유별 수치는 `frontend/public/dictionary/report.json`에 기록합니다.
 
-원본은 WordNet 3.0이며, 소문자 알파벳 2~24자로 이루어진 단어 중 wordfreq 사용 빈도 상위 10,000개를 선정했습니다. 각 표제어의 첫 번째 WordNet 의미 하나를 제공합니다. 뜻은 영어 정의이며 품사, synset ID, 원본 버전, Zipf 빈도를 보존합니다. 전체 WordNet을 모두 담은 것은 아닙니다.
+현재 수집량은 10,000 표제어·22,238 의미입니다. 데이터는 `frontend/public/dictionary/wordnet.sqlite3`와 `frontend/src/wordnet.json`에 들어 있습니다. **실제 AI 모델이 연결되지 않아 평가 완료 단어는 0개입니다. 빈도로만 지정했던 이전 레벨은 철회했습니다.** 기존 개인 카드·시험 기록은 보존하며 이전의 임시 공용 카드는 새 학습 출처에서 제외합니다.
 
-현재 단계는 **사용 빈도 기준 임시 분류**입니다. L1은 Zipf ≥5 (878개), L2는 4≤Zipf<5 (4,547개), L3는 Zipf<4 (4,575개)입니다. 기존의 AI 10점 평가 기준과 다르며 AI가 평가했다고 표시하지 않습니다. 목록은 성능을 위해 200개까지만 표시하지만 학습과 시험은 선택 단계 전체를 사용합니다.
+분류는 반드시 사용 빈도 0~3 + 추상성 0~2 + 주요 의미군 복잡도 0~2 + 형태 난이도 0~1 + 사용 맥락 0~2의 10점 기준을 사용합니다. 빈도는 설정 파일의 Zipf 구간을 적용하고, 나머지 네 항목은 실제 AI의 JSON 정수 점수와 근거를 검증합니다. 0~3은 L1, 4~6은 L2, 7~10은 L3입니다. 빈도 미확인·AI 미평가·오류·검수 미완료 항목에 임시 레벨을 부여하지 않습니다.
 
-미리 생성한 SQLite 파일은 `frontend/public/dictionary/wordnet.sqlite3`, 웹용 동일 데이터는 `frontend/src/wordnet.json`입니다. Pages 배포에는 이 DB와 라이선스도 포함됩니다. 브라우저에서는 동일 사전 자료를 IndexedDB에 저장해 학습합니다. 서버 실행 모드의 개인 SQLite DB와 자동 동기화되지는 않습니다.
+평가 단위는 표제어+품사입니다. 평가에 사용한 정의 집합·필터 정책을 원본 버전 해시에 포함해 의미 구성이 바뀌면 이전 결과를 재사용하지 않습니다. 모델·평가 기준 버전·상태·오류·시각·점수·근거는 evaluations에 보존합니다. 같은 조건의 완료 결과는 재사용하고 실패한 결과는 다음 실행에서 재시도합니다.
 
-재생성 (저장소 루트):
+기존에 설치된 Ollama 모델을 .env의 OLLAMA_MODEL과 OLLAMA_URL에 지정한 후 저장소 루트에서:
 
 ```bash
 PYTHONPATH=backend .venv/bin/python -m scripts.prepare_wordnet
+# 수집만: 평가 대기 자료 생성
+PYTHONPATH=backend .venv/bin/python -m scripts.build_catalog
+# 실제 5개 항목 평가 (처음에는 작은 배치로 검증)
+PYTHONPATH=backend .venv/bin/python -m scripts.build_catalog --evaluate --limit 20
+PYTHONPATH=backend .venv/bin/python -m scripts.review export data/review.csv
+PYTHONPATH=backend .venv/bin/python -m scripts.review approve <검수한_평가_ID>
+# 같은 모델의 승인된 결과만 공개 카탈로그에 반영
 PYTHONPATH=backend .venv/bin/python -m scripts.build_catalog
 ```
 
-사전 데이터만 생성하며 유료 API나 AI 모델 다운로드를 사용하지 않습니다.
+Windows에서는 PYTHONPATH를 PowerShell 환경변수로 지정하고 `.venv/bin/python`을 `.\.venv\Scripts\python.exe`로 바꿉니다. 모델을 자동 다운로드하거나 유료 API를 호출하지 않습니다. 생성된 카탈로그를 커밋·배포하면 방문자는 별도 AI 실행 없이 사전 평가된 단어로 학습합니다.
