@@ -174,8 +174,29 @@ test("여러 탭의 저장 충돌 방지, 삭제 규칙과 빈 출처", async ({
   await api(second, `/cards/${c.id}`, "DELETE");
   expect((await api(page, "/saved")).length).toBe(0);
   await page.goto("#/levels");
-  await expect(page.locator(".word-row")).toHaveCount(10);
+  await expect(page.locator(".word-row")).toHaveCount(200);
+  const levels=await api(page,"/levels");
+  expect(levels.reduce((n:number,l:any)=>n+l.total,0)).toBe(10000);
+  const full=await api(page,"/study","POST",{source:{kind:"level",level:1},count:"all"});
+  expect(full.cards.length).toBe(878);
+  expect(new Set(full.cards.map((c:any)=>c.word)).size).toBe(878);
+  expect(full.cards.every((c:any)=>c.classification_kind==="frequency")).toBe(true);
+  const lookup=await api(page,"/dictionary/lookup","POST",{words:["apple"]});
+  expect(lookup.results[0].candidates[0].source).toBe("wordnet");
   await expect(
     page.getByRole("button", { name: "자동 수집·난이도 분류" }),
   ).toHaveCount(0);
+});
+
+test('기존 개인 자료를 유지하며 사전을 한 번만 추가',async({page})=>{
+  await page.evaluate(async()=>{
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('word-garden',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+    await new Promise<void>((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put({version:1,seq:8,cards:{7:{id:7,word:'myword',definition:'나의 뜻',pos:'',notes:'',accepted_answers:[],important:true,forgotten:false,kind:'personal'}},books:[{id:8,name:'기존 단어장',ids:[7],created_at:'2026-01-01'}],studies:{},exams:{}},'app');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error);});db.close();
+  });
+  await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
+  expect((await api(page,'/notebooks/8')).cards[0].word).toBe('myword');
+  expect((await api(page,'/saved'))[0].id).toBe(7);
+  const levels=await api(page,'/levels');expect(levels.reduce((sum:number,l:any)=>sum+l.total,0)).toBe(10000);
+  await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
+  expect(await api(page,'/levels')).toEqual(levels);
 });

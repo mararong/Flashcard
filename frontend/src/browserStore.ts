@@ -1,4 +1,4 @@
-import demo from "./demo.json";
+import catalog from "./wordnet.json";
 import type { Card, Exam, Source, Study } from "./api";
 
 type StoredCard = Card & { level?: number };
@@ -6,6 +6,7 @@ type Book = { id: number; name: string; created_at: string; ids: number[] };
 type StoredExam = Exam & { snapshot: StoredCard[]; created_at: string };
 type State = {
   version: 1;
+  catalogVersion?: string;
   seq: number;
   cards: Record<number, StoredCard>;
   books: Book[];
@@ -26,24 +27,17 @@ function initial(): State {
     studies: {},
     exams: {},
   };
-  for (const [level, word, pos, definition] of demo) {
-    const id = ++state.seq;
-    state.cards[id] = {
-      id,
-      word: String(word),
-      pos: String(pos),
-      definition: String(definition),
-      level: Number(level),
-      notes: "",
-      accepted_answers: [],
-      important: false,
-      forgotten: false,
-      kind: "public",
-      classification_kind: "manual_demo",
-      dictionary_id: id,
-    };
-  }
   return state;
+}
+function installCatalog(state:State){
+  if(state.catalogVersion==='wordnet-3.0-10000-v1')return false;
+  const existing=new Set(Object.values(state.cards).filter(c=>c.classification_kind==='frequency').map(c=>c.word));
+  for(const entry of catalog){
+    if(existing.has(entry.word))continue;
+    const id=++state.seq;
+    state.cards[id]={...entry,id,notes:'WordNet '+entry.source_version+' · '+entry.sense_key+' · Zipf '+entry.zipf+' · 사용 빈도 기준 임시 단계 (AI 평가 아님)',accepted_answers:[],important:false,forgotten:false,kind:'public',classification_kind:'frequency',dictionary_id:id};
+  }
+  state.catalogVersion='wordnet-3.0-10000-v1';return true;
 }
 let connection: Promise<IDBDatabase> | undefined;
 function database() {
@@ -92,8 +86,9 @@ export async function browserApi(
           fail(
             "지원하지 않는 저장 형식입니다. 데이터를 삭제하지 말고 앱을 업데이트해 주세요.",
           );
+        const installed=installCatalog(state);
         result = route(state, path, method, body);
-        store.put(state, "app");
+        if(installed || method!=="GET") store.put(state, "app");
       } catch (e) {
         error = e;
         tx.abort();
@@ -134,7 +129,7 @@ function cards(s: State, source: Source): StoredCard[] {
     values =
       source.category && source.category !== "all" && source.category !== "demo"
         ? []
-        : values.filter((c) => c.kind === "public" && c.level === source.level);
+        : values.filter((c) => c.kind === "public" && c.level === source.level && (source.category=== "demo" ? c.classification_kind==="manual_demo" : c.classification_kind!=="manual_demo"));
   else if (source.kind === "saved")
     values = values.filter(
       (c) =>
@@ -332,7 +327,7 @@ function route(s: State, path: string, method: string, body: unknown): unknown {
           word,
           candidates: all
             .filter((c) => c.kind === "public" && norm(c.word) === word)
-            .map((c) => ({ ...c, source: "demo" })),
+            .map((c) => ({ ...c, source: c.classification_kind==="frequency"?"wordnet":"demo" })),
         }),
       ),
     };
@@ -343,14 +338,14 @@ function route(s: State, path: string, method: string, body: unknown): unknown {
           kind: "level",
           level: Number(p[1]),
           category: q.get("category") || "all",
-        }),
+        }).slice(0,200),
       );
     return [1, 2, 3].map((level) => ({
       level,
-      demo: 10,
+      demo: all.filter(c=>c.level===level&&c.classification_kind==="manual_demo").length,
       ai: 0,
       ai_auto: 0,
-      total: 10,
+      total: cards(s,{kind:"level",level}).length,
     }));
   }
   if (p[0] === "saved")
