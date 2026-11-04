@@ -13,7 +13,7 @@ import {
   Sprout,
   X,
 } from "lucide-react";
-import { go } from "./api";
+import { go, IS_BROWSER_MODE } from "./api";
 import {
   ToastContext,
   Empty,
@@ -115,7 +115,11 @@ export default function App() {
               <br />
               조금씩 자라는 나의 영어.
             </p>
-            <span>나만의 로컬 학습 공간</span>
+            <span>
+              {IS_BROWSER_MODE
+                ? "브라우저에 저장되는 학습 공간"
+                : "나만의 로컬 학습 공간"}
+            </span>
           </div>
         </aside>
         {menu && (
@@ -141,10 +145,20 @@ export default function App() {
             </div>
             <span className="local-badge">
               <span />
-              개인용 · 로컬
+              {IS_BROWSER_MODE ? "개인용 · 브라우저 저장" : "개인용 · 로컬"}
             </span>
           </header>
-          <main>{content}</main>
+          <main>
+            {IS_BROWSER_MODE && (
+              <div className="notice" role="note">
+                브라우저 저장 모드 · 단어장과 기록은 이 기기의 이 브라우저에만
+                저장됩니다. 브라우저 데이터를 삭제하면 기록도 삭제됩니다. 시험은
+                브라우저에서 채점하며 WordNet·Ollama 수집은 서버 실행 모드에서
+                지원합니다.
+              </div>
+            )}
+            {content}
+          </main>
           <footer>
             단어의 숲 <span>작은 배움이 쌓이는 곳</span>
           </footer>
@@ -344,10 +358,12 @@ function HomePage() {
         <Leaf size={19} />
         <p>
           공용 단어는 <strong>시연용 수동 분류</strong> 30개로 시작합니다.
-          레벨별 학습에서 WordNet 단어를 자동 수집하고 난이도를 분류할 수 있습니다.
+          {IS_BROWSER_MODE
+            ? "개인 단어장에 새 단어와 뜻을 직접 추가할 수 있습니다."
+            : "레벨별 학습에서 WordNet 단어를 자동 수집하고 난이도를 분류할 수 있습니다."}
         </p>
       </div>
-      {health.data && (
+      {health.data && !IS_BROWSER_MODE && (
         <p className="setup-note">
           WordNet{" "}
           {health.data.wordnet_available ? "사용 가능" : "데이터 설치 필요"} ·

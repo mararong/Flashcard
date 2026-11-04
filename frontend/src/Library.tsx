@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { api, go, posName, type Card, type Notebook, type Source } from "./api";
 import { WordnetCollection } from "./WordnetCollection";
+import { IS_BROWSER_MODE } from "./api";
 import {
   Empty,
   Failure,
@@ -871,10 +872,11 @@ export function LevelsPage() {
         <LeafIcon />
         <p>
           WordNet에서 수집한 단어는 <strong>AI 자동 분류</strong>로 표시됩니다.
-          자동 분류는 추정 난이도이며, 사람이 확인한 결과는 검수 완료로 구분합니다.
+          자동 분류는 추정 난이도이며, 사람이 확인한 결과는 검수 완료로
+          구분합니다.
         </p>
       </div>
-      <WordnetCollection onComplete={cards.refresh} />
+      {!IS_BROWSER_MODE && <WordnetCollection onComplete={cards.refresh} />}
       <div className="toolbar">
         <div className="tabs">
           {[
@@ -910,7 +912,9 @@ export function LevelsPage() {
               <span className="tag">
                 {c.classification_kind === "manual_demo"
                   ? "시연용 수동 분류"
-                  : c.classification_kind === "ai_auto" ? "AI 자동 분류" : "AI · 검수 완료"}
+                  : c.classification_kind === "ai_auto"
+                    ? "AI 자동 분류"
+                    : "AI · 검수 완료"}
               </span>
             </WordRow>
           ))}

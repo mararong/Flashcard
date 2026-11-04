@@ -16,6 +16,7 @@ import {
   go,
   posName,
   sourceName,
+  IS_BROWSER_MODE,
   type Exam,
   type Notebook,
   type Study,
@@ -581,11 +582,18 @@ function AnswerExam({
           }),
         )
         .then(() => {
-          if (active) setSaveStatus("서버에 저장됨");
+          if (active)
+            setSaveStatus(
+              IS_BROWSER_MODE ? "이 브라우저에 저장됨" : "서버에 저장됨",
+            );
         })
         .catch(() => {
           if (active)
-            setSaveStatus("서버 저장 실패 · 이 브라우저에 임시 보관됨");
+            setSaveStatus(
+              IS_BROWSER_MODE
+                ? "브라우저 저장 실패 · 저장 공간과 권한을 확인해 주세요."
+                : "서버 저장 실패 · 이 브라우저에 임시 보관됨",
+            );
         });
     }, 350);
     return () => {

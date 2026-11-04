@@ -1,3 +1,4 @@
+export const IS_BROWSER_MODE = import.meta.env.VITE_STORAGE_MODE === "browser";
 export type Card = {
   id: number;
   word: string;
@@ -69,6 +70,10 @@ export async function api<T>(
   method = "GET",
   body?: unknown,
 ): Promise<T> {
+  if (IS_BROWSER_MODE) {
+    const { browserApi } = await import("./browserStore");
+    return browserApi(path, method, body) as Promise<T>;
+  }
   let response: Response;
   try {
     response = await fetch(`/api${path}`, {

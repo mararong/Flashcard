@@ -2,6 +2,29 @@
 
 한 사람이 자기 컴퓨터에서 실행하는 영어 학습 프로토타입입니다. React + TypeScript + Vite, Python FastAPI, SQLite를 사용합니다. **AI·WordNet·음성 기능이 없어도 개인 단어장, 학습, 저장, 시험은 실행됩니다.**
 
+## 설치 없이 GitHub Pages에서 사용하기
+
+브라우저 버전 주소: **https://mararong.github.io/Flashcard/**
+
+저장소 소유자는 처음 한 번 [Settings → Pages](https://github.com/mararong/Flashcard/settings/pages)에서 **Build and deployment → Source → GitHub Actions**를 선택하세요. 이후 main에 푸시할 때 `.github/workflows/pages.yml`이 브라우저 모드를 빌드·테스트·배포합니다. 처음 배포는 [Actions](https://github.com/mararong/Flashcard/actions)에서 **Deploy GitHub Pages → Run workflow → main**으로 시작할 수도 있습니다. 배포 작업이 성공한 후 위 주소에서 사용할 수 있습니다. GitHub 플랜과 저장소 공개 범위에 따라 Pages 사용 가능 여부가 다릅니다.
+
+Pages에서는 Python 서버 없이 **IndexedDB**에 단어장, 카드, 중요·잊음 표시, 학습 세션, 시험 답안·결과를 저장합니다. 서버 모드의 SQLite와는 별도의 자료이며 자동으로 옮겨지거나 동기화되지 않습니다. 기기·브라우저가 바뀌면 별도 자료를 사용하고, 브라우저 데이터를 삭제하거나 시크릿 모드를 종료하면 자료를 잃을 수 있습니다.
+
+시험도 브라우저에서 채점합니다. 제출 전 화면과 시험 데이터 응답에는 정답을 넣지 않지만, 브라우저 저장소와 소스에는 정답 자료가 있으므로 서버 채점과 같은 보안 경계는 없습니다. 개인 연습용입니다. WordNet 자동 수집, Zipf 계산, Ollama 평가는 아래의 Python 서버 실행 모드에서 지원합니다. Pages는 수동 분류 시연 단어 30개와 개인 입력 단어로 학습·시험을 제공합니다.
+
+브라우저 모드를 로컬에서 확인하려면 PowerShell에서:
+
+```powershell
+npm --prefix frontend ci
+$env:VITE_STORAGE_MODE = "browser"
+npm --prefix frontend run build
+Remove-Item Env:VITE_STORAGE_MODE
+cd frontend
+npx vite preview --host 127.0.0.1 --port 4173
+```
+
+브라우저 검증은 `frontend`에서 `npm run test:pages`로 실행합니다. 먼저 브라우저 모드로 빌드해야 하며, Playwright Chromium 준비 방법은 아래 테스트 절을 참고하세요. 테스트는 서버 없이 `/Flashcard/` 하위 경로에서 데스크톱·모바일의 등록·저장·복원·채점과 여러 탭의 동시 저장을 확인합니다. 서버 모드를 다시 사용할 때는 `VITE_STORAGE_MODE` 없이 빌드하세요.
+
 ## 빠른 시작: Windows PowerShell
 
 Python 3.12와 Node.js 22.12 이상(검증 환경: Python 3.12, Node 24)이 필요합니다. 아래 명령은 모두 저장소 루트에서 실행합니다. 가상환경 활성화나 PowerShell 실행 정책 변경은 필요하지 않습니다.
@@ -38,7 +61,7 @@ npm --prefix frontend run build
 node server.mjs
 ```
 
-별도 터미널에서 `npm --prefix frontend run dev`로 개발 화면을 실행할 수 있습니다. 모든 서버 명령과 기본 설정은 `127.0.0.1`에만 바인딩합니다. 공개 배포를 위한 설정은 포함하지 않습니다.
+별도 터미널에서 `npm --prefix frontend run dev`로 개발 화면을 실행할 수 있습니다. 로컬 서버 명령과 기본 설정은 `127.0.0.1`에만 바인딩합니다. GitHub Pages 배포는 위의 별도 브라우저 모드를 사용합니다.
 
 설치 후에는 저장소 루트에서 `node server.mjs`만 실행하면 됩니다. 이 진입점은 Python 백엔드를 시작해 빌드된 화면과 API를 함께 제공합니다. 포트는 기본 8000이며 `PORT` 환경 변수로 변경할 수 있습니다. 개발 화면의 Vite 프록시는 기본 백엔드 포트 8000을 사용합니다.
 
