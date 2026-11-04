@@ -2,6 +2,8 @@
 
 한 사람이 자기 컴퓨터에서 실행하는 영어 학습 프로토타입입니다. React + TypeScript + Vite, Python FastAPI, SQLite를 사용합니다. **AI·WordNet·음성 기능이 없어도 개인 단어장, 학습, 저장, 시험은 실행됩니다.**
 
+**내 PC의 Ollama로 10개 시험 평가 → 전체 평가·재개 → 공용 결과를 클라우드로 이동하는 절차:** [Windows PowerShell 실행 안내](docs/LOCAL_OLLAMA.md). 기본 주소는 `http://localhost:11434`이고 모델은 `OLLAMA_MODEL` 환경변수로 지정합니다. 클라우드에서는 가져오기·게시만 수행하며 사용자 PC로 연결하지 않습니다.
+
 ## 설치 없이 GitHub Pages에서 사용하기
 
 브라우저 버전 주소: **https://mararong.github.io/Flashcard/**
