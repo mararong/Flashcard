@@ -189,6 +189,7 @@ test("여러 탭의 저장 충돌 방지, 삭제 규칙과 빈 출처", async ({
 });
 
 test('기존 개인 자료를 유지하며 사전을 한 번만 추가',async({page})=>{
+  await api(page,'/health');
   await page.evaluate(async()=>{
     const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('word-garden',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
     await new Promise<void>((resolve,reject)=>{const tx=db.transaction('state','readwrite');tx.objectStore('state').put({version:1,seq:8,cards:{7:{id:7,word:'myword',definition:'나의 뜻',pos:'',notes:'',accepted_answers:[],important:true,forgotten:false,kind:'personal'}},books:[{id:8,name:'기존 단어장',ids:[7],created_at:'2026-01-01'}],studies:{},exams:{}},'app');tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error);});db.close();
