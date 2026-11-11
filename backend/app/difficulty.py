@@ -95,7 +95,7 @@ def ask_ollama(client, word, pos, definitions, model):
     return json.loads(response.json()['response'])
 
 
-def evaluate_group(word,pos,source_version,definitions,model,client=None):
+def evaluate_group(word,pos,source_version,definitions,model,client=None,*,evaluator=None):
     settings,rubric_version=load_rubric()
     with connect() as db:
         old=db.execute('''SELECT * FROM evaluations WHERE word=? AND pos=? AND model=? AND rubric_version=? AND source_version=?''',
@@ -105,7 +105,9 @@ def evaluate_group(word,pos,source_version,definitions,model,client=None):
     zipf,freq=calculate_frequency(word,settings)
     scores=reasons=total=level=error=None
     try:
-        if client is None:
+        if evaluator is not None:
+            payload=evaluator(word,pos,definitions)
+        elif client is None:
             with httpx.Client(timeout=120,trust_env=False) as own_client:
                 ensure_model(own_client,model)
                 payload=ask_ollama(own_client,word,pos,definitions,model)

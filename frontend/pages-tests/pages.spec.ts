@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+const publicCatalog = JSON.parse(readFileSync('src/wordnet.json','utf8'));
+const published = publicCatalog.filter((r:any)=>r.status==='approved' && r.level!==null);
 const chunk =
   "/Flashcard/assets/" +
   readdirSync("dist/assets").find((f) => /^browserStore-.*\.js$/.test(f));
@@ -174,9 +176,11 @@ test("여러 탭의 저장 충돌 방지, 삭제 규칙과 빈 출처", async ({
   await api(second, `/cards/${c.id}`, "DELETE");
   expect((await api(page, "/saved")).length).toBe(0);
   await page.goto("#/levels");
-  await expect(page.getByRole('heading',{name:'이 조건의 단어가 아직 없어요'})).toBeVisible();
+  const levelOneCount=published.filter((r:any)=>r.level===1).length;
+  if(levelOneCount)await expect(page.locator('.word-row')).toHaveCount(Math.min(200,levelOneCount));
+  else await expect(page.getByRole('heading',{name:'이 조건의 단어가 아직 없어요'})).toBeVisible();
   const levels=await api(page,'/levels');
-  expect(levels.reduce((n:number,l:any)=>n+l.total,0)).toBe(0);
+  expect(levels.reduce((n:number,l:any)=>n+l.total,0)).toBe(published.length);
   const lookup=await api(page,"/dictionary/lookup","POST",{words:["apple"]});
   expect(lookup.results[0].candidates[0].source).toBe("wordnet");
   await expect(
@@ -193,7 +197,24 @@ test('기존 개인 자료를 유지하며 사전을 한 번만 추가',async({p
   await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
   expect((await api(page,'/notebooks/8')).cards[0].word).toBe('myword');
   expect((await api(page,'/saved'))[0].id).toBe(7);
-  const levels=await api(page,'/levels');expect(levels.reduce((sum:number,l:any)=>sum+l.total,0)).toBe(0);
+  const levels=await api(page,'/levels');expect(levels.reduce((sum:number,l:any)=>sum+l.total,0)).toBe(published.length);
   await page.reload();await expect(page.getByRole('heading',{name:'오늘도, 한 단어씩.'})).toBeVisible();
   expect(await api(page,'/levels')).toEqual(levels);
+});
+
+test('승인된 AI 단어가 AI 필터·학습·시험 출처에 포함',async({page})=>{
+  await api(page,'/health');
+  const id=await page.evaluate(async()=>{
+    const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open('word-garden',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+    let id=0;
+    await new Promise<void>((resolve,reject)=>{const tx=db.transaction('state','readwrite');const store=tx.objectStore('state');const r=store.get('app');r.onsuccess=()=>{const s=r.result;id=++s.seq;s.cards[id]={id,word:'fixtureword',definition:'approved AI test meaning',pos:'n',notes:'test fixture',accepted_answers:[],important:false,forgotten:false,kind:'public',classification_kind:'ai',level:2};store.put(s,'app');};tx.oncomplete=()=>resolve();tx.onabort=()=>reject(tx.error);});db.close();return id;
+  });
+  const levels=await api(page,'/levels');expect(levels[1].ai).toBe(published.filter((r:any)=>r.level===2).length+1);
+  const rows=await api(page,'/levels/2/cards?category=ai');
+  // The list is capped at 200; the study/exam source must use the full selection.
+  const study=await api(page,'/study','POST',{source:{kind:'level',level:2,category:'ai'},count:'all'});
+  expect(study.cards.some((c:any)=>c.id===id)).toBe(true);
+  const exam=await api(page,'/exams','POST',{source:{kind:'level',level:2,category:'ai'},count:'all'});
+  expect(exam.questions.some((q:any)=>q.definition==='approved AI test meaning')).toBe(true);
+  expect(rows.length).toBeGreaterThan(0);
 });

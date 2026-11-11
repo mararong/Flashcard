@@ -1,0 +1,225 @@
+name: Evaluate words with Cloudflare AI
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'evaluate: 평가·재개 / publish: 검수한 ID 승인 후 학습용 사전 생성'
+        type: choice
+        options: ['evaluate', 'publish']
+        default: 'evaluate'
+        required: true
+      approved_ids:
+        description: 'publish에서 승인할 평가 ID (검수 CSV 기준, 예: 1,2,3). 이미 승인했으면 비워도 됨'
+        type: string
+        default: ''
+      limit:
+        description: '10개 표제어 시험 또는 전체 사전 (완료 결과는 재사용)'
+        type: choice
+        options: ['10', '10000']
+        default: '10'
+        required: true
+      max_requests:
+        description: '이번 실행의 최대 AI 요청 수 (여러 품사는 각각 평가)'
+        type: choice
+        options: ['10', '20', '50', '100', '300']
+        default: '20'
+        required: true
+      free_plan_confirmed:
+        description: 'Cloudflare Workers Free 플랜이며 유료 전용 모델을 사용하지 않음을 확인'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cloudflare-word-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: backend
+      FLASHCARD_DB: data/cloudflare-evaluations.sqlite3
+      CLOUDFLARE_MODEL: ${{ vars.CLOUDFLARE_MODEL || '@cf/meta/llama-3.1-8b-instruct' }}
+      OLLAMA_MODEL: ${{ format('cloudflare:{0}', vars.CLOUDFLARE_MODEL || '@cf/meta/llama-3.1-8b-instruct') }}
+      CF_FREE_PLAN_CONFIRMED: ${{ inputs.free_plan_confirmed }}
+      EVALUATION_OPERATION: ${{ inputs.operation }}
+      EVALUATION_APPROVED_IDS: ${{ inputs.approved_ids }}
+      EVALUATION_LIMIT: ${{ inputs.limit }}
+      EVALUATION_MAX_REQUESTS: ${{ inputs.max_requests }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Check configuration
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            printf '%s\n' 'main 브랜치를 선택해 실행하세요.' >&2
+            exit 1
+          fi
+          if [ "$EVALUATION_OPERATION" = evaluate ]; then
+            if [ "$CF_FREE_PLAN_CONFIRMED" != true ]; then
+              printf '%s\n' 'Cloudflare Free 플랜을 확인한 후 확인란을 선택하세요.' >&2
+              exit 1
+            fi
+            if [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+              printf '%s\n' 'GitHub Secrets에 CLOUDFLARE_ACCOUNT_ID와 CLOUDFLARE_API_TOKEN을 등록하세요.' >&2
+              exit 1
+            fi
+          fi
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.lock
+      - name: Select model-specific checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="$(python - <<'PY'
+          import hashlib, os
+          model = os.environ['CLOUDFLARE_MODEL']
+          print('cloudflare-results-' + hashlib.sha256(model.encode()).hexdigest()[:12] + '.json')
+          PY
+          )"
+          printf 'CF_CHECKPOINT_NAME=%s\nCF_CHECKPOINT=data/%s\n' "$name" "$name" >> "$GITHUB_ENV"
+      - name: Restore public evaluation checkpoint
+        id: restore
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data
+          if git ls-remote --exit-code --heads origin ai-data >/dev/null; then
+            git fetch --no-tags --depth=1 origin refs/heads/ai-data:refs/remotes/origin/ai-data
+            if git cat-file -e "refs/remotes/origin/ai-data:$CF_CHECKPOINT_NAME"; then
+              git show "refs/remotes/origin/ai-data:$CF_CHECKPOINT_NAME" > "$CF_CHECKPOINT"
+            fi
+          else
+            result=$?
+            if [ "$result" -ne 2 ]; then
+              printf '%s\n' '평가 데이터 브랜치를 확인하지 못했습니다. 기존 결과를 보존하기 위해 중단합니다.' >&2
+              exit "$result"
+            fi
+          fi
+      - name: Evaluate and checkpoint
+        if: ${{ inputs.operation == 'evaluate' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: >-
+          python -m scripts.cloudflare_evaluate run
+          --limit "$EVALUATION_LIMIT"
+          --max-requests "$EVALUATION_MAX_REQUESTS"
+          --checkpoint "$CF_CHECKPOINT"
+      - name: Import checkpoint for offline publication
+        id: import_public
+        if: ${{ inputs.operation == 'publish' }}
+        run: python -m scripts.local_evaluate import "$CF_CHECKPOINT"
+      - name: Approve explicitly reviewed evaluation IDs
+        if: ${{ inputs.operation == 'publish' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os, re
+          from app.db import connect
+          from app.difficulty import load_rubric, review_evaluation
+          text = os.environ['EVALUATION_APPROVED_IDS'].strip()
+          if not text:
+              print('새 승인 ID 없음: 기존 승인 결과만 사용합니다.')
+              raise SystemExit(0)
+          if not re.fullmatch(r'[0-9]+(?:[\s,]+[0-9]+)*', text):
+              raise SystemExit('approved_ids에는 검수한 숫자 ID만 쉼표나 공백으로 구분해 입력하세요.')
+          ids = list(dict.fromkeys(int(x) for x in re.split(r'[\s,]+', text)))
+          if any(x <= 0 for x in ids) or len(ids) > 1000:
+              raise SystemExit('한 번에 1~1000개의 양수 평가 ID를 지정하세요.')
+          model = os.environ['OLLAMA_MODEL']
+          _, rubric = load_rubric()
+          with connect() as db:
+              for item_id in ids:
+                  row = db.execute('SELECT * FROM evaluations WHERE id=?', (item_id,)).fetchone()
+                  if not row or row['model'] != model or row['rubric_version'] != rubric or row['status'] != 'complete':
+                      raise SystemExit('현재 모델·기준의 정상 평가 ID만 승인할 수 있습니다. 최신 CSV를 확인하세요.')
+          for item_id in ids:
+              review_evaluation(item_id, True)
+          print(f'{len(ids)}개 평가를 명시적으로 승인했습니다.')
+          PY
+      - name: Build approved public catalog without AI calls
+        if: ${{ inputs.operation == 'publish' }}
+        run: python -m scripts.cloudflare_evaluate publish
+      - name: Refresh publication checkpoint
+        if: ${{ always() && steps.import_public.outcome == 'success' }}
+        run: python -m scripts.local_evaluate export "$CF_CHECKPOINT"
+      - name: Save public checkpoint to ai-data
+        if: ${{ always() && steps.restore.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s "$CF_CHECKPOINT" ]; then
+            printf '%s\n' '저장할 새 공용 평가 체크포인트가 없습니다.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          evaluation_index="$(mktemp)"
+          rm "$evaluation_index"
+          export GIT_INDEX_FILE="$evaluation_index"
+          trap 'rm -f "$evaluation_index"' EXIT
+          parent=()
+          if git show-ref --verify --quiet refs/remotes/origin/ai-data; then
+            git read-tree refs/remotes/origin/ai-data
+            parent=(-p refs/remotes/origin/ai-data)
+          else
+            git read-tree --empty
+          fi
+          blob="$(git hash-object -w "$CF_CHECKPOINT")"
+          git update-index --add --cacheinfo "100644,$blob,$CF_CHECKPOINT_NAME"
+          tree="$(git write-tree)"
+          if [ "${#parent[@]}" -gt 0 ] && [ "$tree" = "$(git rev-parse refs/remotes/origin/ai-data^{tree})" ]; then
+            printf '%s\n' '공용 평가 결과 변경 없음'
+            exit 0
+          fi
+          commit="$(git commit-tree "$tree" "${parent[@]}" -m 'data: save Cloudflare word evaluations')"
+          git push origin "$commit:refs/heads/ai-data"
+      - name: Save generated public catalog to main
+        if: ${{ inputs.operation == 'publish' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add frontend/src/wordnet.json frontend/public/dictionary/wordnet.sqlite3 frontend/public/dictionary/report.json
+          if git diff --cached --quiet; then
+            printf '%s\n' '게시용 공용 사전 변경 없음'
+            exit 0
+          fi
+          git commit -m 'data: publish reviewed Cloudflare word levels'
+          git push origin HEAD:main
+      - name: Export review CSV
+        if: ${{ always() && steps.restore.outcome == 'success' }}
+        env:
+          FLASHCARD_DB: data/review-evaluations.sqlite3
+        run: |
+          if [ -s "$CF_CHECKPOINT" ]; then
+            python -m scripts.local_evaluate import "$CF_CHECKPOINT"
+            python -m scripts.review export data/cloudflare-review.csv
+          fi
+      - name: Upload public review files
+        if: ${{ always() && steps.restore.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-public-evaluations-${{ github.run_id }}
+          path: |
+            data/cloudflare-results-*.json
+            data/cloudflare-review.csv
+          if-no-files-found: ignore
+          retention-days: 30

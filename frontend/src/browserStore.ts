@@ -127,10 +127,9 @@ function cards(s: State, source: Source): StoredCard[] {
   if (source.kind === "notebook")
     values = book(s, source.notebook_id!).ids.map((id) => card(s, id));
   else if (source.kind === "level")
-    values =
-      source.category && source.category !== "all" && source.category !== "demo"
-        ? []
-        : values.filter((c) => c.kind === "public" && c.level === source.level && (source.category=== "demo" ? c.classification_kind==="manual_demo" : c.classification_kind!=="manual_demo"));
+    values = values.filter((c) => c.kind === "public" && c.level === source.level &&
+      (source.category === "demo" ? c.classification_kind === "manual_demo" :
+       source.category === "ai" ? c.classification_kind === "ai" || c.classification_kind === "ai_auto" : true));
   else if (source.kind === "saved")
     values = values.filter(
       (c) =>
@@ -344,7 +343,7 @@ function route(s: State, path: string, method: string, body: unknown): unknown {
     return [1, 2, 3].map((level) => ({
       level,
       demo: all.filter(c=>c.level===level&&c.classification_kind==="manual_demo").length,
-      ai: 0,
+      ai: cards(s,{kind:"level",level,category:"ai"}).length,
       ai_auto: 0,
       total: cards(s,{kind:"level",level}).length,
     }));

@@ -2,7 +2,9 @@
 
 한 사람이 자기 컴퓨터에서 실행하는 영어 학습 프로토타입입니다. React + TypeScript + Vite, Python FastAPI, SQLite를 사용합니다. **AI·WordNet·음성 기능이 없어도 개인 단어장, 학습, 저장, 시험은 실행됩니다.**
 
-**내 PC의 Ollama로 10개 시험 평가 → 전체 평가·재개 → 공용 결과를 클라우드로 이동하는 절차:** [Windows PowerShell 실행 안내](docs/LOCAL_OLLAMA.md). 기본 주소는 `http://localhost:11434`이고 모델은 `OLLAMA_MODEL` 환경변수로 지정합니다. 클라우드에서는 가져오기·게시만 수행하며 사용자 PC로 연결하지 않습니다.
+**로컬 설치 없이 평가하기:** [Cloudflare Workers AI + GitHub Actions 설정](docs/CLOUDFLARE_AI.md). GitHub Secrets를 등록하고 Actions에서 10개 시험 평가 또는 전체 평가를 실행합니다. 결과는 SQLite와 별도 데이터 브랜치에 보존하며, 무료 한도에 도달하면 중단 후 다음 실행에서 재개합니다.
+
+**기존 로컬 방식(선택):** 내 PC의 Ollama로 10개 시험 평가 → 전체 평가·재개 → 공용 결과를 클라우드로 이동하는 절차는 [Windows PowerShell 실행 안내](docs/LOCAL_OLLAMA.md)에 있습니다. 기본 주소는 `http://localhost:11434`이고 모델은 `OLLAMA_MODEL` 환경변수로 지정합니다. 이 Ollama 절차에서는 클라우드가 사용자 PC로 연결하지 않습니다.
 
 ## 설치 없이 GitHub Pages에서 사용하기
 
